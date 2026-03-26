@@ -1,0 +1,18 @@
+const VALID_TRANSITIONS = {
+  SUBMITTED: ['UNDER_REVIEW'],
+  UNDER_REVIEW: ['COMPLIANCE_REVIEW'],
+  COMPLIANCE_REVIEW: ['PENDING_DECISION'],
+  PENDING_DECISION: ['APPROVED', 'REJECTED', 'PENDING_INFO'],
+  PENDING_INFO: ['COMPLIANCE_REVIEW', 'PENDING_DECISION'],
+  APPROVED: ['DISBURSEMENT'],
+  DISBURSEMENT: ['COMPLETED'],
+  REJECTED: [],
+  COMPLETED: [],
+};
+
+function isValidTransition(from, to) {
+  const allowed = VALID_TRANSITIONS[from] || [];
+  return allowed.includes(to);
+}
+
+module.exports = { VALID_TRANSITIONS, isValidTransition };

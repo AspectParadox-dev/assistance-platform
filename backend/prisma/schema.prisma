@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CASE_MANAGER
+  COMPLIANCE_OFFICER
+  PRESIDENT
+  TREASURER
+  ADMIN
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  COMPLIANCE_REVIEW
+  PENDING_DECISION
+  APPROVED
+  REJECTED
+  PENDING_INFO
+  DISBURSEMENT
+  COMPLETED
+}
+
+enum DecisionOutcome {
+  APPROVED
+  REJECTED
+  PENDING_INFO
+}
+
+enum DisbursementStatus {
+  SCHEDULED
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CHECK
+  ZELLE
+  ACH
+  CASH
+  ONLINE
+  OTHER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedApplications Application[] @relation("CaseManagerApplications")
+  notes                Note[]
+  decisions            Decision[]
+  disbursements        Disbursement[]
+  documents            Document[]
+}
+
+model Application {
+  id                     String            @id @default(uuid())
+  referenceNumber        String            @unique
+  status                 ApplicationStatus @default(SUBMITTED)
+
+  // Personal info
+  firstName              String
+  lastName               String
+  email                  String
+  phone                  String
+
+  // Address
+  address                String
+  city                   String
+  state                  String
+  zip                    String
+
+  // Household & employment
+  householdSize          Int
+  monthlyIncome          Float
+  employmentStatus       String
+
+  // Hardship & request
+  hardshipDescription    String
+  assistanceType         String
+  requestedAmount        Float
+
+  // Case management
+  assignedCaseManagerId  String?
+  assignedCaseManager    User?             @relation("CaseManagerApplications", fields: [assignedCaseManagerId], references: [id])
+
+  // Compliance
+  complianceChecklistData Json?
+
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  notes                  Note[]
+  documents              Document[]
+  decisions              Decision[]
+  disbursements          Disbursement[]
+
+  @@index([status])
+  @@index([assignedCaseManagerId])
+  @@index([email])
+  @@index([createdAt])
+}
+
+model Note {
+  id            String      @id @default(uuid())
+  content       String
+  isInternal    Boolean     @default(false)
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        User        @relation(fields: [authorId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+model Document {
+  id            String      @id @default(uuid())
+  filename      String
+  originalName  String
+  mimeType      String
+  size          Int
+  storagePath   String
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  uploadedById  String
+  uploadedBy    User        @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+model Decision {
+  id             String          @id @default(uuid())
+  outcome        DecisionOutcome
+  rationale      String
+  approvedAmount Float?
+  applicationId  String
+  application    Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  madeById       String
+  madeBy         User            @relation(fields: [madeById], references: [id])
+  createdAt      DateTime        @default(now())
+
+  @@index([applicationId])
+}
+
+model Disbursement {
+  id              String             @id @default(uuid())
+  amount          Float
+  method          PaymentMethod
+  referenceNumber String?
+  scheduledDate   DateTime
+  paidDate        DateTime?
+  status          DisbursementStatus @default(SCHEDULED)
+  notes           String?
+  applicationId   String
+  application     Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  processedById   String
+  processedBy     User               @relation(fields: [processedById], references: [id])
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([applicationId])
+  @@index([status])
+}
+
+model Donation {
+  id              String        @id @default(uuid())
+  donorName       String
+  donorEmail      String?
+  amount          Float
+  method          PaymentMethod
+  referenceNumber String?
+  receivedDate    DateTime
+  notes           String?
+  importBatchId   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([receivedDate])
+  @@index([method])
+}
