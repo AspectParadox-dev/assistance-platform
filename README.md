@@ -40,7 +40,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your DATABASE_URL and JWT_SECRET
+# Fill in the required values described in the Configuration section below
 
 # Run database migrations
 npm run db:migrate
@@ -70,6 +70,60 @@ npm run dev
 ```
 
 Frontend runs on `http://localhost:5173` and proxies `/api` to the backend.
+
+---
+
+## Configuration
+
+All backend configuration lives in `backend/.env`. Copy `backend/.env.example` to `backend/.env` and fill in the values below.
+
+### Required
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string, e.g. `postgresql://user:password@localhost:5432/assistance_platform` |
+| `JWT_SECRET` | A long, random secret string used to sign auth tokens — change this in production |
+
+### Optional but Recommended
+
+| Variable | Default | Description |
+|---|---|---|
+| `JWT_EXPIRES_IN` | `7d` | How long login tokens stay valid |
+| `FRONTEND_URL` | `http://localhost:5173` | Frontend origin — used for CORS. Set to your production domain when deploying |
+| `PORT` | `3000` | Port the backend API listens on |
+| `NODE_ENV` | `development` | Set to `production` when deploying |
+
+### Email Notifications (optional)
+
+Set `EMAIL_ENABLED=true` to activate outbound emails. Uses any SMTP provider — Gmail recommended for development.
+
+| Variable | Description |
+|---|---|
+| `EMAIL_ENABLED` | `true` to send emails, `false` to suppress all sends |
+| `SMTP_HOST` | SMTP server host, e.g. `smtp.gmail.com` |
+| `SMTP_PORT` | `587` for STARTTLS, `465` for SSL |
+| `SMTP_SECURE` | `false` for port 587, `true` for port 465 |
+| `SMTP_USER` | Your email address |
+| `SMTP_PASS` | Your email password — for Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your account password |
+| `SMTP_FROM` | The "From" address shown on outgoing emails |
+| `APP_URL` | Base URL of the frontend — used to generate links inside emails |
+
+### File Storage (optional)
+
+| Variable | Default | Description |
+|---|---|---|
+| `STORAGE_BACKEND` | `local` | `local` stores uploads on disk. Set to `s3` to use AWS S3 (see S3 variables below) |
+| `UPLOAD_DIR` | `./uploads` | Local directory for uploads (only used when `STORAGE_BACKEND=local`) |
+| `AWS_ACCESS_KEY_ID` | — | Required only when `STORAGE_BACKEND=s3` |
+| `AWS_SECRET_ACCESS_KEY` | — | Required only when `STORAGE_BACKEND=s3` |
+| `AWS_REGION` | `us-east-1` | Required only when `STORAGE_BACKEND=s3` |
+| `AWS_S3_BUCKET` | — | Required only when `STORAGE_BACKEND=s3` |
+
+### Other
+
+| Variable | Default | Description |
+|---|---|---|
+| `MAX_REASONABLE_AMOUNT` | `10000` | Max assistance amount considered "reasonable" by the auto-compliance checker |
 
 ---
 
