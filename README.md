@@ -1,6 +1,8 @@
 # Assistance Management Platform
 
-A web-based platform to manage the full lifecycle of assistance requests — from public applicant intake through case management, compliance review, presidential approval, and treasurer disbursement.
+A web-based platform for companies to manage the full lifecycle of assistance requests — from public applicant intake through case management, compliance review, presidential approval, and treasurer disbursement.
+Clients submit applications while case managers, compliance reviewers, the president, and the treasurer process applicants. The currently designed use case is that for a nonprofit charity organization that helps clients in need of 
+financial assistance. 
 
 ---
 
