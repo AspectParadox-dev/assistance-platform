@@ -23,7 +23,7 @@ async function main() {
 
   const caseManager = await prisma.user.upsert({
     where: { email: 'cm@example.com' },
-    update: {},
+    update: { role: 'CASE_MANAGER' },
     create: {
       email: 'cm@example.com',
       passwordHash: hash('CaseManager123!'),
