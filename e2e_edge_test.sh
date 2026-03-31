@@ -102,8 +102,9 @@ check "Donation rejects missing amount" "$NO_AMT" "error"
 DISB_NOTFOUND=$(curl -s -X POST "$BASE/applications/00000000-0000-0000-0000-000000000000/disbursements" -H "Authorization: Bearer $TREAS_TOKEN" -H "Content-Type: application/json" -d "{\"amount\":100,\"method\":\"CHECK\",\"scheduledDate\":\"2026-04-01T00:00:00.000Z\"}")
 check "Disbursement on nonexistent app returns error" "$DISB_NOTFOUND" "error"
 
-# User management: admin can create user
-NEW_USER=$(curl -s -X POST "$BASE/users" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d "{\"email\":\"newcm_e2e@example.com\",\"password\":\"NewCM123!\",\"firstName\":\"New\",\"lastName\":\"CaseManager\",\"role\":\"CASE_MANAGER\"}")
+# User management: admin can create user (unique email per run to stay idempotent)
+SUFFIX=$(date +%s)
+NEW_USER=$(curl -s -X POST "$BASE/users" -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" -d "{\"email\":\"newcm_${SUFFIX}@example.com\",\"password\":\"NewCM123!\",\"firstName\":\"New\",\"lastName\":\"CaseManager\",\"role\":\"CASE_MANAGER\"}")
 check "Admin can create user" "$NEW_USER" "email"
 
 # CM cannot create user
