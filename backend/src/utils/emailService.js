@@ -238,6 +238,23 @@ async function sendCaseAssigned(caseManager, app) {
   });
 }
 
+async function sendEmailVerification(user, verificationUrl) {
+  await send({
+    to: user.email,
+    subject: 'Verify your Assistance Platform account',
+    html: wrap(`
+      <p>Hi ${escapeHtml(user.firstName)},</p>
+      <p>Your Assistance Platform staff account has been created. Please verify your email address to activate your account and sign in.</p>
+      <div style="text-align:center;margin:24px 0">
+        <a href="${escapeHtml(verificationUrl)}" style="display:inline-block;background:#1e40af;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:16px">Verify Email Address</a>
+      </div>
+      <p style="font-size:12px;color:#6b7280">If the button doesn't work, paste this link into your browser:<br/>${escapeHtml(verificationUrl)}</p>
+      <p style="font-size:12px;color:#6b7280">This link expires in 24 hours. If you didn't expect this email, you can safely ignore it.</p>
+    `),
+    text: `Hi ${user.firstName},\n\nPlease verify your email address by clicking the link below:\n\n${verificationUrl}\n\nThis link expires in 24 hours.`,
+  });
+}
+
 module.exports = {
   sendApplicationReceived,
   sendStatusUpdated,
@@ -245,4 +262,5 @@ module.exports = {
   sendDisbursementScheduled,
   sendDisbursementPaid,
   sendCaseAssigned,
+  sendEmailVerification,
 };

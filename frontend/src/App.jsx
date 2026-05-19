@@ -9,6 +9,7 @@ import IntakePage from './pages/public/IntakePage';
 import IntakeSuccessPage from './pages/public/IntakeSuccessPage';
 import StatusCheckPage from './pages/public/StatusCheckPage';
 import LoginPage from './pages/auth/LoginPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import NotFoundPage from './pages/shared/NotFoundPage';
 
 // Staff pages
@@ -42,6 +43,7 @@ export default function App() {
       <Route path="/apply/success" element={<IntakeSuccessPage />} />
       <Route path="/status" element={<StatusCheckPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
 
       {/* Protected */}
       <Route element={<ProtectedRoute />}>

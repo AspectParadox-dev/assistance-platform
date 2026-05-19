@@ -36,7 +36,9 @@ function errorHandler(err, req, res, next) {
 
   // For 4xx errors thrown by our own code with Object.assign({ status }), the message is intentionally safe
   const message = err.message || 'Error';
-  res.status(status).json({ error: 'Error', message });
+  const body = { error: 'Error', message };
+  if (err.appCode) body.code = err.appCode;
+  res.status(status).json(body);
 }
 
 module.exports = { errorHandler };

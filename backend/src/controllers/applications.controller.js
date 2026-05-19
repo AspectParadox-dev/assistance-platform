@@ -49,6 +49,9 @@ async function assign(req, res, next) {
     if (!caseManagerId) {
       return res.status(400).json({ error: 'Bad Request', message: 'caseManagerId is required' });
     }
+    if (req.user.role === 'CASE_MANAGER' && caseManagerId !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden', message: 'Case managers can only assign applications to themselves' });
+    }
     const app = await service.assign(req.params.id, caseManagerId);
     res.json(app);
   } catch (err) { next(err); }

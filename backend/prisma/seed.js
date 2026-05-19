@@ -11,61 +11,66 @@ async function main() {
   // Create one user per role
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {},
+    update: { emailVerified: true },
     create: {
       email: 'admin@example.com',
       passwordHash: hash('Admin123!'),
       firstName: 'System',
       lastName: 'Admin',
       role: 'ADMIN',
+      emailVerified: true,
     },
   });
 
   const caseManager = await prisma.user.upsert({
     where: { email: 'cm@example.com' },
-    update: { role: 'CASE_MANAGER' },
+    update: { role: 'CASE_MANAGER', emailVerified: true },
     create: {
       email: 'cm@example.com',
       passwordHash: hash('CaseManager123!'),
       firstName: 'Jane',
       lastName: 'Smith',
       role: 'CASE_MANAGER',
+      emailVerified: true,
     },
   });
 
   await prisma.user.upsert({
     where: { email: 'compliance@example.com' },
-    update: {},
+    update: { emailVerified: true },
     create: {
       email: 'compliance@example.com',
       passwordHash: hash('Compliance123!'),
       firstName: 'Bob',
       lastName: 'Jones',
       role: 'COMPLIANCE_OFFICER',
+      emailVerified: true,
     },
   });
 
   await prisma.user.upsert({
     where: { email: 'president@example.com' },
-    update: {},
+    update: { emailVerified: true },
     create: {
       email: 'president@example.com',
       passwordHash: hash('President123!'),
       firstName: 'Mary',
       lastName: 'Williams',
       role: 'PRESIDENT',
+      emailVerified: true,
     },
   });
 
   await prisma.user.upsert({
     where: { email: 'treasurer@example.com' },
-    update: {},
+    update: { emailVerified: true },
     create: {
       email: 'treasurer@example.com',
       passwordHash: hash('Treasurer123!'),
       firstName: 'Tom',
       lastName: 'Brown',
       role: 'TREASURER',
+      emailVerified: true,
     },
   });
 

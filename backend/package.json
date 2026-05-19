@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
+    "build": "prisma generate && prisma migrate deploy",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "node prisma/seed.js",
@@ -16,6 +17,7 @@
     "@aws-sdk/s3-request-presigner": "^3.540.0",
     "@prisma/client": "^5.10.0",
     "bcryptjs": "^2.4.3",
+    "google-auth-library": "^9.0.0",
     "cors": "^2.8.5",
     "csv-parse": "^5.5.3",
     "dotenv": "^16.4.1",

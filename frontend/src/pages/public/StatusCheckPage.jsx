@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { checkApplicationStatus } from '../../api/public.api';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
+
+const STORAGE_KEY = 'ap_saved_app';
 
 function StatusBadge({ status, label }) {
   const colors = {
@@ -30,7 +32,6 @@ function Timeline({ stages, currentStep, isRejected }) {
       {stages.map((stage, i) => {
         const isDone = i < currentStep;
         const isCurrent = i === currentStep && !isRejected;
-        const isFuture = i > currentStep || (isRejected && i >= currentStep);
 
         return (
           <li key={stage.key} className="ml-6">
@@ -65,8 +66,39 @@ export default function StatusCheckPage() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hasSaved, setHasSaved] = useState(false);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // On mount: load any saved application and auto-check
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const { referenceNumber, email } = JSON.parse(saved);
+        if (referenceNumber && email) {
+          setForm({ referenceNumber, email });
+          setHasSaved(true);
+          // Auto-submit
+          setLoading(true);
+          checkApplicationStatus(referenceNumber.trim(), email.trim())
+            .then((data) => setResult(data))
+            .catch(() => {})
+            .finally(() => setLoading(false));
+        }
+      }
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
+
+  function handleClearSaved() {
+    localStorage.removeItem(STORAGE_KEY);
+    setHasSaved(false);
+    setForm({ referenceNumber: '', email: '' });
+    setResult(null);
+    setError('');
+  }
 
   async function handleCheck(e) {
     e.preventDefault();
@@ -76,6 +108,9 @@ export default function StatusCheckPage() {
     try {
       const data = await checkApplicationStatus(form.referenceNumber.trim(), form.email.trim());
       setResult(data);
+      // Persist for next visit
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ referenceNumber: form.referenceNumber.trim(), email: form.email.trim() }));
+      setHasSaved(true);
     } catch (err) {
       setError(
         err.response?.status === 404
@@ -95,12 +130,22 @@ export default function StatusCheckPage() {
           <p className="text-gray-500 mt-2">Enter your reference number and email to see your application status.</p>
         </div>
 
-        <div className="text-right mb-4 text-sm space-x-4">
-          <Link to="/apply" className="text-primary-600 hover:underline">Submit an Application</Link>
-          <Link to="/login" className="text-primary-600 hover:underline">Staff Login</Link>
+        <div className="flex items-center justify-between mb-4 text-sm">
+          <div className="space-x-4">
+            <Link to="/apply" className="text-primary-600 hover:underline">Submit an Application</Link>
+            <Link to="/login" className="text-primary-600 hover:underline">Staff Login</Link>
+          </div>
+          {hasSaved && (
+            <button type="button" onClick={handleClearSaved} className="text-gray-400 hover:text-red-500 text-xs underline">
+              Clear saved application
+            </button>
+          )}
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-8">
+          {hasSaved && !loading && (
+            <p className="text-xs text-primary-600 mb-4 text-center">Your saved application was loaded automatically.</p>
+          )}
           <form onSubmit={handleCheck} className="space-y-4">
             <Input
               label="Reference Number"

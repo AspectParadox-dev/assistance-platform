@@ -19,4 +19,14 @@ function verifyToken(token) {
   return jwt.verify(token, RESOLVED_SECRET);
 }
 
-module.exports = { signToken, verifyToken };
+function signVerificationToken(userId) {
+  return jwt.sign({ userId, type: 'email-verify' }, RESOLVED_SECRET, { expiresIn: '24h' });
+}
+
+function verifyVerificationToken(token) {
+  const payload = jwt.verify(token, RESOLVED_SECRET);
+  if (payload.type !== 'email-verify') throw new Error('Invalid token type');
+  return payload;
+}
+
+module.exports = { signToken, verifyToken, signVerificationToken, verifyVerificationToken };

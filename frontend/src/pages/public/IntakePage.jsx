@@ -84,6 +84,7 @@ export default function IntakePage() {
         requestedAmount: parseFloat(form.requestedAmount),
       };
       const app = await createApplication(data);
+      localStorage.setItem('ap_saved_app', JSON.stringify({ referenceNumber: app.referenceNumber, email: form.email }));
       navigate('/apply/success', { state: { referenceNumber: app.referenceNumber } });
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Submission failed. Please check your information.');

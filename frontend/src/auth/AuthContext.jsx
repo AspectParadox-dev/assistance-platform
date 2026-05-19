@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login as apiLogin, getMe } from '../api/auth.api';
+import { login as apiLogin, getMe, googleLogin as apiGoogleLogin } from '../api/auth.api';
 
 const AuthContext = createContext(null);
 
@@ -31,6 +31,16 @@ export function AuthProvider({ children }) {
     return user;
   }
 
+  async function googleLogin(credential) {
+    const { token, user } = await apiGoogleLogin(credential);
+    if (!token || token === 'undefined' || token === 'null') {
+      throw new Error('Authentication failed: server did not return a valid token');
+    }
+    localStorage.setItem('token', token);
+    setUser(user);
+    return user;
+  }
+
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     setUser(null);
@@ -38,7 +48,7 @@ export function AuthProvider({ children }) {
   }, [navigate]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
