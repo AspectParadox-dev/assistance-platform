@@ -1,11 +1,11 @@
 const prisma = require('../utils/prismaClient');
-const applicationsService = require('./applications.service');
 const email = require('../utils/emailService');
 
-async function list({ status, applicationId, page = 1, limit = 20 } = {}) {
+async function list({ status, applicationId, organizationId, page = 1, limit = 20 } = {}) {
   const where = {};
   if (status) where.status = status;
   if (applicationId) where.applicationId = applicationId;
+  if (organizationId) where.application = { organizationId };
 
   const [data, total] = await Promise.all([
     prisma.disbursement.findMany({
@@ -24,26 +24,32 @@ async function list({ status, applicationId, page = 1, limit = 20 } = {}) {
   return { data, total, page: Number(page), limit: Number(limit) };
 }
 
-async function getById(id) {
+async function getById(id, organizationId) {
+  const where = { id };
   const d = await prisma.disbursement.findUnique({
-    where: { id },
+    where,
     include: {
       application: true,
       processedBy: { select: { id: true, firstName: true, lastName: true } },
     },
   });
   if (!d) throw Object.assign(new Error('Disbursement not found'), { status: 404 });
+  // Org check via parent application
+  if (organizationId && d.application.organizationId !== organizationId) {
+    throw Object.assign(new Error('Disbursement not found'), { status: 404 });
+  }
   return d;
 }
 
-async function create(applicationId, processedById, data) {
-  const app = await prisma.application.findUnique({ where: { id: applicationId } });
+async function create(applicationId, processedById, data, organizationId) {
+  const appWhere = { id: applicationId };
+  if (organizationId) appWhere.organizationId = organizationId;
+  const app = await prisma.application.findFirst({ where: appWhere });
   if (!app) throw Object.assign(new Error('Application not found'), { status: 404 });
   if (app.status !== 'APPROVED') {
     throw Object.assign(new Error('Application must be in APPROVED status to schedule disbursement'), { status: 400 });
   }
 
-  // Atomically create the disbursement and advance the application status together
   const [disbursement] = await prisma.$transaction([
     prisma.disbursement.create({
       data: { ...data, applicationId, processedById, status: 'SCHEDULED' },
@@ -57,9 +63,8 @@ async function create(applicationId, processedById, data) {
   return disbursement;
 }
 
-async function update(id, data) {
-  const existing = await getById(id);
-  // Guard: only allow the PAID transition from SCHEDULED; reject any other source state.
+async function update(id, data, organizationId) {
+  const existing = await getById(id, organizationId);
   if (data.status === 'PAID' && existing.status !== 'SCHEDULED') {
     if (existing.status === 'PAID') {
       throw Object.assign(new Error('Disbursement is already marked as PAID'), { status: 400 });
@@ -78,7 +83,6 @@ async function update(id, data) {
   let updated;
   if (markingPaid) {
     updateData.paidDate = new Date();
-    // Atomically mark the disbursement PAID and advance the application to COMPLETED
     const [disbursement] = await prisma.$transaction([
       prisma.disbursement.update({ where: { id }, data: updateData }),
       prisma.application.update({ where: { id: existing.applicationId }, data: { status: 'COMPLETED' } }),

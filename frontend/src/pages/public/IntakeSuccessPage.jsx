@@ -1,7 +1,8 @@
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, useParams, Link } from 'react-router-dom';
 
 export default function IntakeSuccessPage() {
   const { state } = useLocation();
+  const { orgSlug } = useParams();
   const ref = state?.referenceNumber;
 
   return (
@@ -29,10 +30,10 @@ export default function IntakeSuccessPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/status" className="inline-block bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
+            <Link to={`/status/${orgSlug}`} className="inline-block bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
               Check Application Status
             </Link>
-            <Link to="/apply" className="inline-block text-primary-600 hover:underline text-sm py-2.5">
+            <Link to={`/apply/${orgSlug}`} className="inline-block text-primary-600 hover:underline text-sm py-2.5">
               Submit another application
             </Link>
           </div>

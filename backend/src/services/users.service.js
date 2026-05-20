@@ -1,28 +1,32 @@
 const prisma = require('../utils/prismaClient');
 const { hashPassword, sendVerificationEmail } = require('./auth.service');
 
-async function list() {
+async function list(organizationId) {
+  const where = {};
+  if (organizationId) where.organizationId = organizationId;
   return prisma.user.findMany({
+    where,
     select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   });
 }
 
-async function create({ email, firstName, lastName, role, password }) {
+async function create({ email, firstName, lastName, role, password, organizationId }) {
   const passwordHash = await hashPassword(password);
   const user = await prisma.user.create({
-    data: { email, firstName, lastName, role, passwordHash },
+    data: { email, firstName, lastName, role, passwordHash, organizationId },
     select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true },
   });
-  // Fire-and-forget — email failure must not block the admin's create action
   sendVerificationEmail(user.id).catch((err) => {
     console.error('[users] Failed to send verification email to', email, ':', err.message);
   });
   return user;
 }
 
-async function update(id, { firstName, lastName, role, email }) {
-  const existing = await prisma.user.findUnique({ where: { id } });
+async function update(id, { firstName, lastName, role, email }, organizationId) {
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const existing = await prisma.user.findFirst({ where });
   if (!existing) throw Object.assign(new Error('User not found'), { status: 404 });
 
   const data = {};
@@ -38,8 +42,10 @@ async function update(id, { firstName, lastName, role, email }) {
   });
 }
 
-async function deactivate(id) {
-  const existing = await prisma.user.findUnique({ where: { id } });
+async function deactivate(id, organizationId) {
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const existing = await prisma.user.findFirst({ where });
   if (!existing) throw Object.assign(new Error('User not found'), { status: 404 });
   return prisma.user.update({
     where: { id },

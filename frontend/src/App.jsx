@@ -31,7 +31,7 @@ const ALL_INTERNAL = ['CASE_MANAGER', 'COMPLIANCE_OFFICER', 'PRESIDENT', 'TREASU
 function RootRedirect() {
   const { isAuthenticated, user } = useAuth();
   if (isAuthenticated && user) return <Navigate to={getDefaultDashboardPath(user.role)} replace />;
-  return <Navigate to="/apply" replace />;
+  return <Navigate to="/apply/default" replace />;
 }
 
 export default function App() {
@@ -39,9 +39,12 @@ export default function App() {
     <Routes>
       {/* Public */}
       <Route path="/" element={<RootRedirect />} />
-      <Route path="/apply" element={<IntakePage />} />
-      <Route path="/apply/success" element={<IntakeSuccessPage />} />
-      <Route path="/status" element={<StatusCheckPage />} />
+      <Route path="/apply/:orgSlug" element={<IntakePage />} />
+      <Route path="/apply/:orgSlug/success" element={<IntakeSuccessPage />} />
+      <Route path="/status/:orgSlug" element={<StatusCheckPage />} />
+      {/* Legacy redirects — old bookmarks go to default org */}
+      <Route path="/apply" element={<Navigate to="/apply/default" replace />} />
+      <Route path="/status" element={<Navigate to="/status/default" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
 

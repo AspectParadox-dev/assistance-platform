@@ -8,10 +8,22 @@ async function main() {
 
   const hash = (pw) => bcrypt.hashSync(pw, 10);
 
-  // Create one user per role
+  // Create (or find) the default organization
+  const defaultOrg = await prisma.organization.upsert({
+    where: { slug: 'default' },
+    update: {},
+    create: {
+      name: 'Default Organization',
+      slug: 'default',
+      isActive: true,
+    },
+  });
+  console.log(`Default org: ${defaultOrg.id} (slug: ${defaultOrg.slug})`);
+
+  // Create one user per role, all belonging to the default org
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: { emailVerified: true },
+    update: { emailVerified: true, organizationId: defaultOrg.id },
     create: {
       email: 'admin@example.com',
       passwordHash: hash('Admin123!'),
@@ -19,12 +31,13 @@ async function main() {
       lastName: 'Admin',
       role: 'ADMIN',
       emailVerified: true,
+      organizationId: defaultOrg.id,
     },
   });
 
   const caseManager = await prisma.user.upsert({
     where: { email: 'cm@example.com' },
-    update: { role: 'CASE_MANAGER', emailVerified: true },
+    update: { role: 'CASE_MANAGER', emailVerified: true, organizationId: defaultOrg.id },
     create: {
       email: 'cm@example.com',
       passwordHash: hash('CaseManager123!'),
@@ -32,12 +45,13 @@ async function main() {
       lastName: 'Smith',
       role: 'CASE_MANAGER',
       emailVerified: true,
+      organizationId: defaultOrg.id,
     },
   });
 
   await prisma.user.upsert({
     where: { email: 'compliance@example.com' },
-    update: { emailVerified: true },
+    update: { emailVerified: true, organizationId: defaultOrg.id },
     create: {
       email: 'compliance@example.com',
       passwordHash: hash('Compliance123!'),
@@ -45,12 +59,13 @@ async function main() {
       lastName: 'Jones',
       role: 'COMPLIANCE_OFFICER',
       emailVerified: true,
+      organizationId: defaultOrg.id,
     },
   });
 
   await prisma.user.upsert({
     where: { email: 'president@example.com' },
-    update: { emailVerified: true },
+    update: { emailVerified: true, organizationId: defaultOrg.id },
     create: {
       email: 'president@example.com',
       passwordHash: hash('President123!'),
@@ -58,12 +73,13 @@ async function main() {
       lastName: 'Williams',
       role: 'PRESIDENT',
       emailVerified: true,
+      organizationId: defaultOrg.id,
     },
   });
 
   await prisma.user.upsert({
     where: { email: 'treasurer@example.com' },
-    update: { emailVerified: true },
+    update: { emailVerified: true, organizationId: defaultOrg.id },
     create: {
       email: 'treasurer@example.com',
       passwordHash: hash('Treasurer123!'),
@@ -71,7 +87,14 @@ async function main() {
       lastName: 'Brown',
       role: 'TREASURER',
       emailVerified: true,
+      organizationId: defaultOrg.id,
     },
+  });
+
+  // Backfill any users that exist but have no org assigned yet
+  await prisma.user.updateMany({
+    where: { organizationId: null },
+    data: { organizationId: defaultOrg.id },
   });
 
   // Sample applications
@@ -93,6 +116,7 @@ async function main() {
       hardshipDescription: 'Lost primary income due to medical emergency.',
       assistanceType: 'Rent',
       requestedAmount: 800,
+      organizationId: defaultOrg.id,
     },
     {
       referenceNumber: 'APP-2026-00002',
@@ -112,6 +136,7 @@ async function main() {
       assistanceType: 'Utilities',
       requestedAmount: 350,
       assignedCaseManagerId: caseManager.id,
+      organizationId: defaultOrg.id,
     },
     {
       referenceNumber: 'APP-2026-00003',
@@ -131,6 +156,7 @@ async function main() {
       assistanceType: 'Medical',
       requestedAmount: 1200,
       assignedCaseManagerId: caseManager.id,
+      organizationId: defaultOrg.id,
     },
     {
       referenceNumber: 'APP-2026-00004',
@@ -150,6 +176,7 @@ async function main() {
       assistanceType: 'Transportation',
       requestedAmount: 500,
       assignedCaseManagerId: caseManager.id,
+      organizationId: defaultOrg.id,
     },
     {
       referenceNumber: 'APP-2026-00005',
@@ -169,19 +196,25 @@ async function main() {
       assistanceType: 'Housing',
       requestedAmount: 1500,
       assignedCaseManagerId: caseManager.id,
+      organizationId: defaultOrg.id,
     },
   ];
 
   for (const app of apps) {
     await prisma.application.upsert({
       where: { referenceNumber: app.referenceNumber },
-      update: {},
+      update: { organizationId: defaultOrg.id },
       create: app,
     });
   }
 
-  // Sample donations — use upsert on referenceNumber to avoid duplicates when seed is run more than once.
-  // Donations without a referenceNumber are skipped if one already exists (checked by donor+amount+date).
+  // Backfill any applications that exist but have no org assigned yet
+  await prisma.application.updateMany({
+    where: { organizationId: null },
+    data: { organizationId: defaultOrg.id },
+  });
+
+  // Sample donations
   const donations = [
     { donorName: 'Community Fund', amount: 5000, method: 'CHECK', referenceNumber: 'SEED-CHK-001', receivedDate: new Date('2026-01-15') },
     { donorName: 'Anonymous', amount: 250, method: 'ZELLE', referenceNumber: 'SEED-ANON-001', receivedDate: new Date('2026-02-01') },
@@ -189,8 +222,6 @@ async function main() {
     { donorName: 'City Foundation', amount: 3000, method: 'CHECK', referenceNumber: 'SEED-CHK-002', receivedDate: new Date('2026-03-01') },
   ];
 
-  // Donation.referenceNumber is not @unique in the schema, so upsert cannot be
-  // used on that field. Use a findFirst check to make the seed idempotent.
   for (const donation of donations) {
     const exists = await prisma.donation.findFirst({
       where: {
@@ -200,11 +231,19 @@ async function main() {
       },
     });
     if (!exists) {
-      await prisma.donation.create({ data: donation });
+      await prisma.donation.create({ data: { ...donation, organizationId: defaultOrg.id } });
     }
   }
 
+  // Backfill any donations that exist but have no org assigned yet
+  await prisma.donation.updateMany({
+    where: { organizationId: null },
+    data: { organizationId: defaultOrg.id },
+  });
+
   console.log('Seed complete.');
+  console.log('\nDefault org slug: default');
+  console.log('  Intake URL: /apply/default');
   console.log('\nDefault credentials:');
   console.log('  admin@example.com          / Admin123!');
   console.log('  cm@example.com             / CaseManager123!');

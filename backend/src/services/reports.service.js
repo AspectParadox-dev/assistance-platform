@@ -1,16 +1,21 @@
 const prisma = require('../utils/prismaClient');
 
-async function summary() {
+async function summary(organizationId) {
+  const orgFilter = organizationId ? { organizationId } : {};
+  const disbursementOrgFilter = organizationId
+    ? { application: { organizationId } }
+    : {};
+
   const [statusGroups, donationAgg, disbursementAgg, pendingDisbursements] = await Promise.all([
-    prisma.application.groupBy({ by: ['status'], _count: { id: true } }),
-    prisma.donation.aggregate({ _sum: { amount: true }, _count: { id: true } }),
+    prisma.application.groupBy({ by: ['status'], where: orgFilter, _count: { id: true } }),
+    prisma.donation.aggregate({ where: orgFilter, _sum: { amount: true }, _count: { id: true } }),
     prisma.disbursement.aggregate({
-      where: { status: 'PAID' },
+      where: { status: 'PAID', ...disbursementOrgFilter },
       _sum: { amount: true },
       _count: { id: true },
     }),
     prisma.disbursement.aggregate({
-      where: { status: 'SCHEDULED' },
+      where: { status: 'SCHEDULED', ...disbursementOrgFilter },
       _sum: { amount: true },
       _count: { id: true },
     }),
@@ -37,22 +42,25 @@ async function summary() {
   };
 }
 
-async function reconciliation({ startDate, endDate, page = 1, limit = 50 } = {}) {
+async function reconciliation({ startDate, endDate, page = 1, limit = 50, organizationId } = {}) {
   const dateFilter = {};
   if (startDate) dateFilter.gte = new Date(startDate);
   if (endDate) {
-    // Include all records on the end date by advancing to end-of-day
     const end = new Date(endDate);
     end.setUTCHours(23, 59, 59, 999);
     dateFilter.lte = end;
   }
 
-  const donationWhere = Object.keys(dateFilter).length ? { receivedDate: dateFilter } : {};
-  const disbursementWhere = Object.keys(dateFilter).length ? { paidDate: dateFilter, status: 'PAID' } : { status: 'PAID' };
+  const hasDates = Object.keys(dateFilter).length > 0;
+  const donationWhere = {
+    ...(organizationId ? { organizationId } : {}),
+    ...(hasDates ? { receivedDate: dateFilter } : {}),
+  };
+  const disbursementWhere = {
+    ...(organizationId ? { application: { organizationId } } : {}),
+    ...(hasDates ? { paidDate: dateFilter, status: 'PAID' } : { status: 'PAID' }),
+  };
 
-  // Fetch both the paginated rows (for display) and the full aggregates (for
-  // accurate totals). Computing totals from only the current page's rows would
-  // return a wrong balance whenever there is more than one page of data.
   const [donations, disbursements, donationAgg, disbursementAgg] = await Promise.all([
     prisma.donation.findMany({ where: donationWhere, orderBy: { receivedDate: 'desc' }, skip: (page - 1) * limit, take: limit }),
     prisma.disbursement.findMany({
@@ -72,8 +80,9 @@ async function reconciliation({ startDate, endDate, page = 1, limit = 50 } = {})
   return { donations, disbursements, totalIn, totalOut, balance: totalIn - totalOut };
 }
 
-async function applicationStats({ startDate, endDate } = {}) {
+async function applicationStats({ startDate, endDate, organizationId } = {}) {
   const where = {};
+  if (organizationId) where.organizationId = organizationId;
   if (startDate || endDate) {
     where.createdAt = {};
     if (startDate) where.createdAt.gte = new Date(startDate);

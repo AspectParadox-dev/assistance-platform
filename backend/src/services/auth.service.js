@@ -17,7 +17,7 @@ if (process.env.GOOGLE_CLIENT_ID) {
 async function login(email, password) {
   const userWithHash = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, passwordHash: true, emailVerified: true },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, passwordHash: true, emailVerified: true, organizationId: true },
   });
   if (!userWithHash || !userWithHash.isActive) {
     throw Object.assign(new Error('Invalid credentials'), { status: 401 });
@@ -35,7 +35,7 @@ async function login(email, password) {
       { status: 403, appCode: 'EMAIL_NOT_VERIFIED' }
     );
   }
-  const token = signToken({ userId: userWithHash.id, role: userWithHash.role });
+  const token = signToken({ userId: userWithHash.id, role: userWithHash.role, organizationId: userWithHash.organizationId });
   const { passwordHash, emailVerified, ...safeUser } = userWithHash;
   return { token, user: safeUser };
 }
@@ -60,7 +60,7 @@ async function googleLogin(credential) {
   // Find by googleId first (already linked), then by email (first-time Google login)
   let user = await prisma.user.findFirst({
     where: { googleId },
-    select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, emailVerified: true },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, emailVerified: true, organizationId: true },
   });
 
   if (!user) {
@@ -78,7 +78,7 @@ async function googleLogin(credential) {
     user = await prisma.user.update({
       where: { id: existing.id },
       data: { googleId, emailVerified: true, emailVerificationToken: null },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, emailVerified: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, emailVerified: true, organizationId: true },
     });
   }
 
@@ -86,7 +86,7 @@ async function googleLogin(credential) {
     throw Object.assign(new Error('This account has been deactivated.'), { status: 401 });
   }
 
-  const token = signToken({ userId: user.id, role: user.role });
+  const token = signToken({ userId: user.id, role: user.role, organizationId: user.organizationId });
   const { emailVerified, ...safeUser } = user;
   return { token, user: safeUser };
 }

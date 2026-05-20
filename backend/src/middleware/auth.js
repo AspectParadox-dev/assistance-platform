@@ -18,7 +18,7 @@ async function authenticate(req, res, next) {
     // hash is never fetched from the database at all during auth middleware.
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true, organizationId: true },
     });
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Unauthorized', message: 'User not found or inactive' });

@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { createApplication } from '../../api/applications.api';
+import { getOrgBySlug } from '../../api/public.api';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Textarea from '../../components/ui/Textarea';
@@ -37,10 +38,19 @@ const INITIAL = {
 
 export default function IntakePage() {
   const navigate = useNavigate();
+  const { orgSlug } = useParams();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(INITIAL);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [orgName, setOrgName] = useState('');
+
+  useEffect(() => {
+    if (!orgSlug) return;
+    getOrgBySlug(orgSlug)
+      .then((org) => setOrgName(org.name))
+      .catch(() => setError('This application link is not valid. Please check the URL and try again.'));
+  }, [orgSlug]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -83,9 +93,9 @@ export default function IntakePage() {
         monthlyIncome: parseFloat(form.monthlyIncome),
         requestedAmount: parseFloat(form.requestedAmount),
       };
-      const app = await createApplication(data);
-      localStorage.setItem('ap_saved_app', JSON.stringify({ referenceNumber: app.referenceNumber, email: form.email }));
-      navigate('/apply/success', { state: { referenceNumber: app.referenceNumber } });
+      const app = await createApplication(orgSlug, data);
+      localStorage.setItem('ap_saved_app', JSON.stringify({ referenceNumber: app.referenceNumber, email: form.email, orgSlug }));
+      navigate(`/apply/${orgSlug}/success`, { state: { referenceNumber: app.referenceNumber } });
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Submission failed. Please check your information.');
       // Stay on the review step so the user can see their data and the error before going back
@@ -98,11 +108,12 @@ export default function IntakePage() {
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
+          {orgName && <p className="text-sm font-medium text-primary-600 mb-1">{orgName}</p>}
           <h1 className="text-3xl font-bold text-primary-800">Request Assistance</h1>
           <p className="text-gray-500 mt-2">Please complete all sections of this application.</p>
         </div>
         <div className="flex justify-between items-center mb-4">
-          <Link to="/status" className="text-sm text-primary-600 hover:underline">Check existing application status</Link>
+          <Link to={`/status/${orgSlug}`} className="text-sm text-primary-600 hover:underline">Check existing application status</Link>
           <Link to="/login" className="text-sm text-primary-600 hover:underline">Staff Login</Link>
         </div>
 

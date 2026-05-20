@@ -10,10 +10,10 @@ const APPLICATION_INCLUDE = {
   disbursements: { include: { processedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' } },
 };
 
-async function generateReferenceNumber() {
+async function generateReferenceNumber(organizationId) {
   const year = new Date().getFullYear();
   const latest = await prisma.application.findFirst({
-    where: { referenceNumber: { startsWith: `APP-${year}-` } },
+    where: { referenceNumber: { startsWith: `APP-${year}-` }, organizationId },
     orderBy: { referenceNumber: 'desc' },
     select: { referenceNumber: true },
   });
@@ -21,11 +21,8 @@ async function generateReferenceNumber() {
   return `APP-${year}-${String(next).padStart(5, '0')}`;
 }
 
-async function create(data) {
+async function create(data, organizationId) {
   // Whitelist only the fields that the public intake form is allowed to set.
-  // This prevents mass-assignment of internal fields (status, assignedCaseManagerId,
-  // complianceChecklistData, etc.) even if a malicious actor injects extra keys
-  // into the POST body — the validate middleware only validates, not strips.
   const safeData = {
     firstName: data.firstName,
     lastName: data.lastName,
@@ -46,10 +43,10 @@ async function create(data) {
   // Retry up to 5 times to handle concurrent submissions hitting the same sequence number
   let lastError;
   for (let attempt = 0; attempt < 5; attempt++) {
-    const referenceNumber = await generateReferenceNumber();
+    const referenceNumber = await generateReferenceNumber(organizationId);
     try {
       const app = await prisma.application.create({
-        data: { ...safeData, referenceNumber, status: 'SUBMITTED' },
+        data: { ...safeData, referenceNumber, status: 'SUBMITTED', organizationId },
       });
       email.sendApplicationReceived(app); // fire-and-forget
       return app;
@@ -61,8 +58,9 @@ async function create(data) {
   throw Object.assign(new Error('Could not generate a unique reference number. Please try again.'), { status: 409, cause: lastError });
 }
 
-async function list({ status, assignedCaseManagerId, search, page = 1, limit = 20 } = {}) {
+async function list({ status, assignedCaseManagerId, search, page = 1, limit = 20, organizationId } = {}) {
   const where = {};
+  if (organizationId) where.organizationId = organizationId;
   if (status) where.status = status;
   if (assignedCaseManagerId) where.assignedCaseManagerId = assignedCaseManagerId;
   if (search) {
@@ -88,18 +86,19 @@ async function list({ status, assignedCaseManagerId, search, page = 1, limit = 2
   return { data, total, page: Number(page), limit: Number(limit) };
 }
 
-async function getById(id) {
-  const app = await prisma.application.findUnique({ where: { id }, include: APPLICATION_INCLUDE });
+async function getById(id, organizationId) {
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const app = await prisma.application.findFirst({ where, include: APPLICATION_INCLUDE });
   if (!app) throw Object.assign(new Error('Application not found'), { status: 404 });
   return app;
 }
 
-async function updateStatus(id, newStatus) {
-  // Run inside a transaction with serializable isolation so the read-then-write
-  // is atomic: a concurrent status change cannot slip in between the validation
-  // check and the update.
+async function updateStatus(id, newStatus, organizationId) {
   const updated = await prisma.$transaction(async (tx) => {
-    const app = await tx.application.findUnique({ where: { id } });
+    const where = { id };
+    if (organizationId) where.organizationId = organizationId;
+    const app = await tx.application.findFirst({ where });
     if (!app) throw Object.assign(new Error('Application not found'), { status: 404 });
     if (!isValidTransition(app.status, newStatus)) {
       throw Object.assign(
@@ -110,7 +109,6 @@ async function updateStatus(id, newStatus) {
     return tx.application.update({ where: { id }, data: { status: newStatus } });
   });
 
-  // Notify applicant for statuses they care about; skip internal-only transitions
   const NOTIFY_STATUSES = ['UNDER_REVIEW', 'PENDING_INFO', 'DISBURSEMENT', 'COMPLETED'];
   if (NOTIFY_STATUSES.includes(newStatus)) {
     email.sendStatusUpdated(updated, newStatus); // fire-and-forget
@@ -118,11 +116,16 @@ async function updateStatus(id, newStatus) {
   return updated;
 }
 
-async function assign(id, caseManagerId) {
-  const app = await prisma.application.findUnique({ where: { id } });
+async function assign(id, caseManagerId, organizationId) {
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const app = await prisma.application.findFirst({ where });
   if (!app) throw Object.assign(new Error('Application not found'), { status: 404 });
 
-  const caseManager = await prisma.user.findUnique({ where: { id: caseManagerId } });
+  // Verify the case manager belongs to the same org
+  const caseManagerWhere = { id: caseManagerId };
+  if (organizationId) caseManagerWhere.organizationId = organizationId;
+  const caseManager = await prisma.user.findFirst({ where: caseManagerWhere });
   if (!caseManager) throw Object.assign(new Error('User not found'), { status: 404 });
   if (!['CASE_MANAGER', 'ADMIN'].includes(caseManager.role)) {
     throw Object.assign(new Error('Only users with the Case Manager or Admin role can be assigned to applications'), { status: 400 });
@@ -137,13 +140,20 @@ async function assign(id, caseManagerId) {
   return updated;
 }
 
-async function updateCompliance(id, checklistData) {
-  const app = await prisma.application.findUnique({ where: { id } });
+async function updateCompliance(id, checklistData, organizationId) {
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const app = await prisma.application.findFirst({ where });
   if (!app) throw Object.assign(new Error('Application not found'), { status: 404 });
   return prisma.application.update({ where: { id }, data: { complianceChecklistData: checklistData } });
 }
 
-async function autoCheckCompliance(id) {
+async function autoCheckCompliance(id, organizationId) {
+  // Verify app belongs to org before running compliance check
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const app = await prisma.application.findFirst({ where });
+  if (!app) throw Object.assign(new Error('Application not found'), { status: 404 });
   const { evaluate } = require('../utils/complianceAutomation');
   return evaluate(id);
 }

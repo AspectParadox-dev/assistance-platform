@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { checkApplicationStatus } from '../../api/public.api';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -62,6 +62,7 @@ function Timeline({ stages, currentStep, isRejected }) {
 }
 
 export default function StatusCheckPage() {
+  const { orgSlug } = useParams();
   const [form, setForm] = useState({ referenceNumber: '', email: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -70,18 +71,18 @@ export default function StatusCheckPage() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  // On mount: load any saved application and auto-check
+  // On mount: load any saved application for this org and auto-check
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const { referenceNumber, email } = JSON.parse(saved);
-        if (referenceNumber && email) {
+        const { referenceNumber, email, orgSlug: savedSlug } = JSON.parse(saved);
+        // Only auto-load if the saved app belongs to this org
+        if (referenceNumber && email && savedSlug === orgSlug) {
           setForm({ referenceNumber, email });
           setHasSaved(true);
-          // Auto-submit
           setLoading(true);
-          checkApplicationStatus(referenceNumber.trim(), email.trim())
+          checkApplicationStatus(orgSlug, referenceNumber.trim(), email.trim())
             .then((data) => setResult(data))
             .catch(() => {})
             .finally(() => setLoading(false));
@@ -90,7 +91,7 @@ export default function StatusCheckPage() {
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
-  }, []);
+  }, [orgSlug]);
 
   function handleClearSaved() {
     localStorage.removeItem(STORAGE_KEY);
@@ -106,10 +107,9 @@ export default function StatusCheckPage() {
     setError('');
     setResult(null);
     try {
-      const data = await checkApplicationStatus(form.referenceNumber.trim(), form.email.trim());
+      const data = await checkApplicationStatus(orgSlug, form.referenceNumber.trim(), form.email.trim());
       setResult(data);
-      // Persist for next visit
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ referenceNumber: form.referenceNumber.trim(), email: form.email.trim() }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ referenceNumber: form.referenceNumber.trim(), email: form.email.trim(), orgSlug }));
       setHasSaved(true);
     } catch (err) {
       setError(
@@ -132,7 +132,7 @@ export default function StatusCheckPage() {
 
         <div className="flex items-center justify-between mb-4 text-sm">
           <div className="space-x-4">
-            <Link to="/apply" className="text-primary-600 hover:underline">Submit an Application</Link>
+            <Link to={`/apply/${orgSlug}`} className="text-primary-600 hover:underline">Submit an Application</Link>
             <Link to="/login" className="text-primary-600 hover:underline">Staff Login</Link>
           </div>
           {hasSaved && (

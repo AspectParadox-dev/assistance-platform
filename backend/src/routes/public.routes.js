@@ -5,10 +5,9 @@ const prisma = require('../utils/prismaClient');
 
 const router = Router();
 
-// Prevent enumeration of reference numbers by brute-force
 const statusLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30,                   // 30 status checks per window per IP
+  windowMs: 15 * 60 * 1000,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too Many Requests', message: 'Too many status check attempts. Please try again in 15 minutes.' },
@@ -17,8 +16,8 @@ const statusLimiter = rateLimit({
 const STATUS_LABELS = {
   SUBMITTED: 'Submitted',
   UNDER_REVIEW: 'Under Review',
-  COMPLIANCE_REVIEW: 'Under Review',       // don't expose internal stage name
-  PENDING_DECISION: 'Under Review',        // same
+  COMPLIANCE_REVIEW: 'Under Review',
+  PENDING_DECISION: 'Under Review',
   APPROVED: 'Approved',
   REJECTED: 'Not Approved',
   PENDING_INFO: 'Additional Information Required',
@@ -27,16 +26,35 @@ const STATUS_LABELS = {
 };
 
 /**
+ * GET /api/public/org/:orgSlug
+ * Returns public info for an org (name + slug) so the intake page can display the org name.
+ * Returns 404 if not found or inactive.
+ */
+router.get('/org/:orgSlug', async (req, res, next) => {
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { slug: req.params.orgSlug },
+      select: { name: true, slug: true, isActive: true },
+    });
+    if (!org || !org.isActive) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+    res.json({ name: org.name, slug: org.slug });
+  } catch (err) { next(err); }
+});
+
+/**
  * POST /api/public/status
- * Body: { referenceNumber, email }
+ * Body: { orgSlug, referenceNumber, email }
  *
- * Returns a safe, public-facing summary of the application status.
- * Requires both referenceNumber AND email to match — prevents enumeration.
+ * Returns a safe, public-facing summary of the application status scoped to the org.
+ * Requires orgSlug + referenceNumber + email to all match — prevents enumeration.
  */
 router.post(
   '/status',
   statusLimiter,
   [
+    body('orgSlug').notEmpty().withMessage('orgSlug is required'),
     body('referenceNumber').notEmpty().withMessage('Reference number is required'),
     body('email').isEmail().withMessage('Valid email is required'),
   ],
@@ -47,10 +65,16 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { referenceNumber, email } = req.body;
+      const { orgSlug, referenceNumber, email } = req.body;
+
+      const org = await prisma.organization.findUnique({ where: { slug: orgSlug } });
+      if (!org || !org.isActive) {
+        return res.status(404).json({ error: 'No application found with that reference number and email combination.' });
+      }
 
       const app = await prisma.application.findFirst({
         where: {
+          organizationId: org.id,
           referenceNumber: referenceNumber.trim().toUpperCase(),
           email: email.trim().toLowerCase(),
         },
@@ -63,14 +87,12 @@ router.post(
         },
       });
 
-      // Return the same generic message whether not found or email mismatch
       if (!app) {
         return res.status(404).json({
           error: 'No application found with that reference number and email combination.',
         });
       }
 
-      // Build a public-safe timeline so the applicant can see where they are
       const STAGES = [
         { key: 'SUBMITTED', label: 'Submitted' },
         { key: 'UNDER_REVIEW', label: 'Under Review' },
@@ -80,7 +102,6 @@ router.post(
         { key: 'COMPLETED', label: 'Completed' },
       ];
 
-      // Map actual status to a timeline step index
       const STATUS_TO_STEP = {
         SUBMITTED: 0,
         UNDER_REVIEW: 1,

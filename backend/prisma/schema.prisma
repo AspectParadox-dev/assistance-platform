@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Organization {
+  id           String        @id @default(uuid())
+  name         String
+  slug         String        @unique
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  users        User[]
+  applications Application[]
+  donations    Donation[]
+}
+
 enum Role {
   CASE_MANAGER
   COMPLIANCE_OFFICER
@@ -62,11 +74,16 @@ model User {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
+  organizationId       String?
+  organization         Organization? @relation(fields: [organizationId], references: [id])
+
   assignedApplications Application[] @relation("CaseManagerApplications")
   notes                Note[]
   decisions            Decision[]
   disbursements        Disbursement[]
   documents            Document[]
+
+  @@index([organizationId])
 }
 
 model Application {
@@ -103,6 +120,10 @@ model Application {
   // Compliance
   complianceChecklistData Json?
 
+  // Multi-tenancy
+  organizationId         String?
+  organization           Organization?     @relation(fields: [organizationId], references: [id])
+
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
@@ -115,6 +136,7 @@ model Application {
   @@index([assignedCaseManagerId])
   @@index([email])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 model Note {
@@ -190,9 +212,12 @@ model Donation {
   receivedDate    DateTime
   notes           String?
   importBatchId   String?
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   @@index([receivedDate])
   @@index([method])
+  @@index([organizationId])
 }

@@ -3,14 +3,14 @@ const { parseDonationCsv } = require('../utils/csvParser');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 
-async function list({ method, startDate, endDate, page = 1, limit = 20 } = {}) {
+async function list({ method, startDate, endDate, page = 1, limit = 20, organizationId } = {}) {
   const where = {};
+  if (organizationId) where.organizationId = organizationId;
   if (method) where.method = method;
   if (startDate || endDate) {
     where.receivedDate = {};
     if (startDate) where.receivedDate.gte = new Date(startDate);
     if (endDate) {
-      // Include all records on the end date by advancing to end-of-day
       const end = new Date(endDate);
       end.setUTCHours(23, 59, 59, 999);
       where.receivedDate.lte = end;
@@ -25,22 +25,18 @@ async function list({ method, startDate, endDate, page = 1, limit = 20 } = {}) {
   return { data, total, page: Number(page), limit: Number(limit) };
 }
 
-async function create(data) {
-  return prisma.donation.create({ data });
+async function create(data, organizationId) {
+  return prisma.donation.create({ data: { ...data, organizationId } });
 }
 
-async function importCsv(source) {
-  // source is either a Buffer (memory storage) or a file path string (disk storage)
+async function importCsv(source, organizationId) {
   const isPath = !Buffer.isBuffer(source);
   const buffer = isPath ? fs.readFileSync(source) : source;
 
   let rows;
   try {
-    // Parse before writing to DB so validation errors are caught first
     rows = parseDonationCsv(buffer);
   } finally {
-    // Always clean up the temp file — even if parsing throws, so we don't
-    // leave orphaned files on disk when the CSV contains invalid data.
     if (isPath) {
       try { fs.unlinkSync(source); } catch { /* ignore cleanup errors */ }
     }
@@ -49,20 +45,24 @@ async function importCsv(source) {
   const importBatchId = uuidv4();
 
   const donations = await prisma.donation.createMany({
-    data: rows.map((r) => ({ ...r, importBatchId })),
+    data: rows.map((r) => ({ ...r, importBatchId, organizationId })),
   });
 
   return { count: donations.count, importBatchId };
 }
 
-async function update(id, data) {
-  const existing = await prisma.donation.findUnique({ where: { id } });
+async function update(id, data, organizationId) {
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const existing = await prisma.donation.findFirst({ where });
   if (!existing) throw Object.assign(new Error('Donation not found'), { status: 404 });
   return prisma.donation.update({ where: { id }, data });
 }
 
-async function remove(id) {
-  const existing = await prisma.donation.findUnique({ where: { id } });
+async function remove(id, organizationId) {
+  const where = { id };
+  if (organizationId) where.organizationId = organizationId;
+  const existing = await prisma.donation.findFirst({ where });
   if (!existing) throw Object.assign(new Error('Donation not found'), { status: 404 });
   return prisma.donation.delete({ where: { id } });
 }

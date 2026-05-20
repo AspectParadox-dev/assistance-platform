@@ -1,5 +1,4 @@
 const prisma = require('../utils/prismaClient');
-const applicationsService = require('./applications.service');
 const email = require('../utils/emailService');
 
 const OUTCOME_TO_STATUS = {
@@ -8,23 +7,23 @@ const OUTCOME_TO_STATUS = {
   PENDING_INFO: 'PENDING_INFO',
 };
 
-async function list(applicationId) {
+async function list(applicationId, organizationId) {
+  const where = { applicationId };
+  if (organizationId) where.application = { organizationId };
   return prisma.decision.findMany({
-    where: { applicationId },
+    where,
     include: { madeBy: { select: { id: true, firstName: true, lastName: true } } },
     orderBy: { createdAt: 'desc' },
   });
 }
 
-async function create(applicationId, madeById, { outcome, rationale, approvedAmount }) {
+async function create(applicationId, madeById, { outcome, rationale, approvedAmount }, organizationId) {
   const newStatus = OUTCOME_TO_STATUS[outcome];
 
-  // Wrap the status check, decision creation, and status update in a single
-  // serializable transaction so that two concurrent requests cannot both read
-  // PENDING_DECISION and both succeed — the second will see the already-changed
-  // status and be rejected.
   const decision = await prisma.$transaction(async (tx) => {
-    const existing = await tx.application.findUnique({ where: { id: applicationId } });
+    const appWhere = { id: applicationId };
+    if (organizationId) appWhere.organizationId = organizationId;
+    const existing = await tx.application.findFirst({ where: appWhere });
     if (!existing) throw Object.assign(new Error('Application not found'), { status: 404 });
     if (existing.status !== 'PENDING_DECISION') {
       throw Object.assign(
@@ -45,7 +44,6 @@ async function create(applicationId, madeById, { outcome, rationale, approvedAmo
     return dec;
   });
 
-  // Fetch the application to get the applicant's email + name for the notification
   const app = await prisma.application.findUnique({ where: { id: applicationId } });
   if (app) email.sendDecision(app, decision); // fire-and-forget
 
