@@ -91,6 +91,21 @@ async function main() {
     },
   });
 
+  await prisma.user.upsert({
+    where: { email: 'arshanwari03@gmail.com' },
+    update: { emailVerified: true, role: 'ADMIN', isActive: true, organizationId: defaultOrg.id },
+    create: {
+      email: 'arshanwari03@gmail.com',
+      passwordHash: hash('Arsh123!'),
+      firstName: 'Arsh',
+      lastName: 'Anwari',
+      role: 'ADMIN',
+      emailVerified: true,
+      isActive: true,
+      organizationId: defaultOrg.id,
+    },
+  });
+
   // Backfill any users that exist but have no org assigned yet
   await prisma.user.updateMany({
     where: { organizationId: null },
