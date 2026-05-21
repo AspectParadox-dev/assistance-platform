@@ -31,6 +31,14 @@ router.post('/resend-verification', loginLimiter, validate([
 ]), resendVerification);
 
 
+router.post('/admin-resend-verification', authenticate, async (req, res, next) => {
+  try {
+    const { sendVerificationEmail } = require('../services/auth.service');
+    await sendVerificationEmail(req.body.userId);
+    res.json({ message: 'Sent' });
+  } catch (err) { next(err); }
+});
+
 router.get('/me', authenticate, me);
 
 module.exports = router;
