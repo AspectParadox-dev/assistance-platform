@@ -93,13 +93,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'arshanwari03@gmail.com' },
-    update: { passwordHash: hash('Arsh123!'), emailVerified: true, role: 'ADMIN', isActive: true, organizationId: defaultOrg.id },
+    update: { passwordHash: hash('Arsh123!'), emailVerified: true, role: 'CASE_MANAGER', isActive: true, organizationId: defaultOrg.id },
     create: {
       email: 'arshanwari03@gmail.com',
       passwordHash: hash('Arsh123!'),
       firstName: 'Arsh',
       lastName: 'Anwari',
-      role: 'ADMIN',
+      role: 'CASE_MANAGER',
       emailVerified: true,
       isActive: true,
       organizationId: defaultOrg.id,
