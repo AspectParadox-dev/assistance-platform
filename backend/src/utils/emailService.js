@@ -21,7 +21,12 @@ if (EMAIL_ENABLED && process.env.RESEND_API_KEY) {
 async function send({ to, subject, html, text }) {
   if (!EMAIL_ENABLED || !resend) return;
   try {
-    await resend.emails.send({ from: FROM, to, subject, html, text });
+    const { data, error } = await resend.emails.send({ from: FROM, to, subject, html, text });
+    if (error) {
+      console.error('[email] Resend error:', JSON.stringify(error));
+    } else {
+      console.log('[email] Sent OK, id:', data.id);
+    }
   } catch (err) {
     console.error('[email] Failed to send:', err.message);
   }
