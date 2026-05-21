@@ -1,6 +1,7 @@
 require('dotenv').config();
 const app = require('./app');
 const prisma = require('./utils/prismaClient');
+const bcrypt = require('bcryptjs');
 
 const PORT = process.env.PORT || 3000;
 
@@ -16,6 +17,27 @@ async function ensureDefaultOrg() {
     const donations = await prisma.donation.updateMany({ where: { organizationId: null }, data: { organizationId: org.id } });
     if (users.count || apps.count || donations.count) {
       console.log(`[startup] Backfilled ${users.count} users, ${apps.count} applications, ${donations.count} donations to default org`);
+    }
+
+    // Seed default admin if no admin exists in this org
+    const adminExists = await prisma.user.findFirst({ where: { organizationId: org.id, role: 'ADMIN' } });
+    if (!adminExists) {
+      const passwordHash = await bcrypt.hash('Admin123!', 12);
+      await prisma.user.upsert({
+        where: { email: 'admin@example.com' },
+        update: { organizationId: org.id, emailVerified: true },
+        create: {
+          email: 'admin@example.com',
+          passwordHash,
+          firstName: 'Admin',
+          lastName: 'User',
+          role: 'ADMIN',
+          isActive: true,
+          emailVerified: true,
+          organizationId: org.id,
+        },
+      });
+      console.log('[startup] Created default admin: admin@example.com / Admin123!');
     }
   } catch (err) {
     console.error('[startup] ensureDefaultOrg failed:', err.message);
