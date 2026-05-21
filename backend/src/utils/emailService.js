@@ -1,6 +1,5 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-/** Escape HTML special characters to prevent markup injection in email bodies. */
 function escapeHtml(str) {
   if (str == null) return '';
   return String(str)
@@ -12,32 +11,21 @@ function escapeHtml(str) {
 }
 
 const EMAIL_ENABLED = process.env.EMAIL_ENABLED === 'true';
-const FROM = process.env.SMTP_FROM || 'no-reply@assistanceplatform.org';
+const FROM = 'AAA Assistance Platform <onboarding@resend.dev>';
 
-let transporter;
-if (EMAIL_ENABLED) {
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === 'true', // true for port 465, false for 587
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+let resend;
+if (EMAIL_ENABLED && process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
 }
 
 async function send({ to, subject, html, text }) {
-  if (!EMAIL_ENABLED) return;
+  if (!EMAIL_ENABLED || !resend) return;
   try {
-    await transporter.sendMail({ from: FROM, to, subject, html, text });
+    await resend.emails.send({ from: FROM, to, subject, html, text });
   } catch (err) {
-    // Log but don't crash — email is non-critical
     console.error('[email] Failed to send:', err.message);
   }
 }
-
-// ── Template helpers ────────────────────────────────────────────────────────
 
 function statusLabel(status) {
   const labels = {
@@ -69,8 +57,6 @@ function wrap(body) {
   `;
 }
 
-// ── Email senders ────────────────────────────────────────────────────────────
-
 async function sendApplicationReceived(app) {
   await send({
     to: app.email,
@@ -100,7 +86,6 @@ async function sendStatusUpdated(app, newStatus) {
     COMPLETED: 'Your assistance has been fully processed. This case is now closed.',
   };
   const message = messages[newStatus] || `Your application status has been updated.`;
-
   await send({
     to: app.email,
     subject: `Application Update — ${app.referenceNumber}`,
@@ -122,9 +107,7 @@ async function sendDecision(app, decision) {
     APPROVED: {
       subject: `Application Approved — ${app.referenceNumber}`,
       headline: 'Your Application Has Been Approved',
-      color: '#15803d',
-      bg: '#f0fdf4',
-      border: '#bbf7d0',
+      color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0',
       body: `
         <p>We are pleased to inform you that your assistance application has been <strong>approved</strong>.</p>
         ${decision.approvedAmount ? `<p>Approved amount: <strong>$${Number(decision.approvedAmount).toFixed(2)}</strong></p>` : ''}
@@ -134,9 +117,7 @@ async function sendDecision(app, decision) {
     REJECTED: {
       subject: `Application Decision — ${app.referenceNumber}`,
       headline: 'Application Not Approved',
-      color: '#b91c1c',
-      bg: '#fef2f2',
-      border: '#fecaca',
+      color: '#b91c1c', bg: '#fef2f2', border: '#fecaca',
       body: `
         <p>After careful review, we were unable to approve your assistance application at this time.</p>
         <p><strong>Reason:</strong> ${escapeHtml(decision.rationale)}</p>
@@ -146,9 +127,7 @@ async function sendDecision(app, decision) {
     PENDING_INFO: {
       subject: `Additional Information Required — ${app.referenceNumber}`,
       headline: 'Additional Information Needed',
-      color: '#b45309',
-      bg: '#fffbeb',
-      border: '#fde68a',
+      color: '#b45309', bg: '#fffbeb', border: '#fde68a',
       body: `
         <p>Our review team requires additional information before a decision can be made on your application.</p>
         <p><strong>Details:</strong> ${escapeHtml(decision.rationale)}</p>
@@ -156,10 +135,8 @@ async function sendDecision(app, decision) {
       `,
     },
   };
-
   const cfg = configs[decision.outcome];
   if (!cfg) return;
-
   await send({
     to: app.email,
     subject: cfg.subject,
@@ -201,7 +178,7 @@ async function sendDisbursementPaid(app, disbursement) {
     subject: `Payment Sent — ${app.referenceNumber}`,
     html: wrap(`
       <p>Dear ${escapeHtml(app.firstName)},</p>
-      <p>Your assistance payment has been sent. Please allow time for processing depending on your payment method.</p>
+      <p>Your assistance payment has been sent.</p>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:16px;margin:16px 0">
         <p style="margin:0 0 8px"><span style="color:#6b7280;font-size:12px">Amount Sent</span><br/><strong style="font-size:20px">$${Number(disbursement.amount).toFixed(2)}</strong></p>
         <p style="margin:0 0 8px"><span style="color:#6b7280;font-size:12px">Method</span><br/><strong>${escapeHtml(disbursement.method)}</strong></p>
@@ -249,7 +226,7 @@ async function sendEmailVerification(user, verificationUrl) {
         <a href="${escapeHtml(verificationUrl)}" style="display:inline-block;background:#1e40af;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:16px">Verify Email Address</a>
       </div>
       <p style="font-size:12px;color:#6b7280">If the button doesn't work, paste this link into your browser:<br/>${escapeHtml(verificationUrl)}</p>
-      <p style="font-size:12px;color:#6b7280">This link expires in 24 hours. If you didn't expect this email, you can safely ignore it.</p>
+      <p style="font-size:12px;color:#6b7280">This link expires in 24 hours.</p>
     `),
     text: `Hi ${user.firstName},\n\nPlease verify your email address by clicking the link below:\n\n${verificationUrl}\n\nThis link expires in 24 hours.`,
   });
