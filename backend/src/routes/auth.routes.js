@@ -30,6 +30,20 @@ router.post('/resend-verification', loginLimiter, validate([
   body('email').isEmail().withMessage('Valid email required'),
 ]), resendVerification);
 
+// TEMP: force-send verification email regardless of verified status — remove after use
+router.post('/force-verify-email', async (req, res) => {
+  const { email } = req.body;
+  const prisma = require('../utils/prismaClient');
+  const { signVerificationToken } = require('../utils/jwt');
+  const emailService = require('../utils/emailService');
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, firstName: true } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const token = signVerificationToken(user.id);
+  const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+  await emailService.sendEmailVerification(user, `${appUrl}/verify-email?token=${token}`);
+  res.json({ message: 'Verification email sent.' });
+});
+
 router.get('/me', authenticate, me);
 
 module.exports = router;
