@@ -28,6 +28,7 @@ export function canAccessRoute(role, routeKey) {
     reconciliation: ['TREASURER', 'ADMIN', 'PRESIDENT'],
     reports: ['PRESIDENT', 'TREASURER', 'ADMIN'],
     users: ['ADMIN'],
+    'form-builder': ['ADMIN'],
   };
   return (access[routeKey] || []).includes(role);
 }

@@ -1,8 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
-import { getApplication } from '../../api/applications.api';
-import { assignApplication } from '../../api/applications.api';
-import { updateStatus } from '../../api/applications.api';
+import { getApplication, assignApplication, updateStatus } from '../../api/applications.api';
+import { listFormFields } from '../../api/form-fields.api';
 import { listUsers } from '../../api/users.api';
 import { useAuth } from '../../auth/AuthContext';
 import PageHeader from '../../components/layout/PageHeader';
@@ -45,6 +44,7 @@ export default function ApplicationDetailPage() {
   const [assignLoading, setAssignLoading] = useState(false);
   const [disbModal, setDisbModal] = useState(false);
   const [statusError, setStatusError] = useState('');
+  const [formFields, setFormFields] = useState([]);
 
   const canAssign = ['CASE_MANAGER', 'ADMIN'].includes(user?.role);
   const canAdvanceStatus = ['CASE_MANAGER', 'COMPLIANCE_OFFICER', 'ADMIN'].includes(user?.role);
@@ -69,6 +69,10 @@ export default function ApplicationDetailPage() {
         .catch(() => {});
     }
   }, [canAssign]);
+
+  useEffect(() => {
+    listFormFields().then(setFormFields).catch(() => {});
+  }, []);
 
   async function handleAssign() {
     if (!assigningId) return;
@@ -165,6 +169,26 @@ export default function ApplicationDetailPage() {
               <p className="text-sm text-gray-800">{app.hardshipDescription}</p>
             </div>
           </Card>
+
+          {app.customData && formFields.length > 0 && (
+            <Card title="Additional Information">
+              <dl className="space-y-3 text-sm">
+                {formFields.map((field) => {
+                  const val = app.customData[field.fieldKey];
+                  if (val === undefined || val === null || val === '') return null;
+                  const display = field.fieldType === 'CHECKBOX'
+                    ? (val === 'true' || val === true ? 'Yes' : 'No')
+                    : String(val);
+                  return (
+                    <div key={field.fieldKey} className="flex justify-between">
+                      <dt className="text-gray-500">{field.label}</dt>
+                      <dd className="font-medium text-gray-900 text-right">{display}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </Card>
+          )}
 
           <Card title="Case Management" actions={
             canAssign && (

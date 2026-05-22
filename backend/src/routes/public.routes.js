@@ -26,6 +26,29 @@ const STATUS_LABELS = {
 };
 
 /**
+ * GET /api/public/org/:orgSlug/form
+ * Returns the org's custom form fields ordered by `order` asc.
+ * Returns empty array if org has no custom fields.
+ */
+router.get('/org/:orgSlug/form', async (req, res, next) => {
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { slug: req.params.orgSlug },
+      select: { id: true, isActive: true },
+    });
+    if (!org || !org.isActive) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+    const fields = await prisma.formField.findMany({
+      where: { organizationId: org.id },
+      orderBy: { order: 'asc' },
+      select: { id: true, label: true, fieldKey: true, fieldType: true, required: true, placeholder: true, options: true },
+    });
+    res.json(fields);
+  } catch (err) { next(err); }
+});
+
+/**
  * GET /api/public/org/:orgSlug
  * Returns public info for an org (name + slug) so the intake page can display the org name.
  * Returns 404 if not found or inactive.

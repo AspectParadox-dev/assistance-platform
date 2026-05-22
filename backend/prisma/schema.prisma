@@ -17,6 +17,34 @@ model Organization {
   users        User[]
   applications Application[]
   donations    Donation[]
+  formFields   FormField[]
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  SELECT
+  NUMBER
+  DATE
+  CHECKBOX
+}
+
+model FormField {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  label          String
+  fieldKey       String
+  fieldType      FieldType    @default(TEXT)
+  required       Boolean      @default(false)
+  order          Int          @default(0)
+  placeholder    String?
+  options        Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, fieldKey])
+  @@index([organizationId])
 }
 
 enum Role {
@@ -116,6 +144,9 @@ model Application {
   // Case management
   assignedCaseManagerId  String?
   assignedCaseManager    User?             @relation("CaseManagerApplications", fields: [assignedCaseManagerId], references: [id])
+
+  // Org-defined custom fields
+  customData              Json?
 
   // Compliance
   complianceChecklistData Json?

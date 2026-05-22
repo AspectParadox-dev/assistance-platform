@@ -38,6 +38,7 @@ async function create(data, organizationId) {
     hardshipDescription: data.hardshipDescription,
     assistanceType: data.assistanceType,
     requestedAmount: data.requestedAmount,
+    ...(data.customData && typeof data.customData === 'object' ? { customData: data.customData } : {}),
   };
 
   // Retry up to 5 times to handle concurrent submissions hitting the same sequence number

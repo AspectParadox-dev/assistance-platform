@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { key: 'reconciliation', label: 'Reconciliation', path: '/dashboard/reconciliation', icon: '📊' },
   { key: 'reports', label: 'Reports', path: '/dashboard/reports', icon: '📈' },
   { key: 'users', label: 'User Management', path: '/dashboard/users', icon: '👥' },
+  { key: 'form-builder', label: 'Intake Form', path: '/dashboard/form-builder', icon: '📝' },
 ];
 
 export default function Sidebar({ onClose }) {

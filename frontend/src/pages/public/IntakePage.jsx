@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { createApplication } from '../../api/applications.api';
-import { getOrgBySlug } from '../../api/public.api';
+import { getOrgBySlug, getOrgForm } from '../../api/public.api';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Textarea from '../../components/ui/Textarea';
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
-
-const STEPS = ['Personal Info', 'Household & Employment', 'Hardship & Request', 'Review & Submit'];
 
 const EMPLOYMENT_OPTIONS = [
   { value: 'Full-time', label: 'Full-time employed' },
@@ -29,30 +27,72 @@ const ASSISTANCE_OPTIONS = [
   { value: 'Other', label: 'Other' },
 ];
 
-const INITIAL = {
+const FIXED_INITIAL = {
   firstName: '', lastName: '', email: '', phone: '',
   address: '', city: '', state: '', zip: '',
   householdSize: '', monthlyIncome: '', employmentStatus: 'Full-time',
   hardshipDescription: '', assistanceType: 'Rent', requestedAmount: '',
 };
 
+function CustomField({ field, value, onChange }) {
+  const common = { label: field.label, value: value ?? '', onChange, required: field.required, placeholder: field.placeholder || '' };
+
+  if (field.fieldType === 'TEXTAREA') return <Textarea {...common} rows={4} />;
+  if (field.fieldType === 'NUMBER') return <Input {...common} type="number" />;
+  if (field.fieldType === 'DATE') return <Input {...common} type="date" />;
+  if (field.fieldType === 'SELECT') {
+    const opts = Array.isArray(field.options) ? field.options.map(o => ({ value: o, label: o })) : [];
+    return <Select label={field.label} options={opts} value={value ?? ''} onChange={onChange} />;
+  }
+  if (field.fieldType === 'CHECKBOX') {
+    return (
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={value === 'true' || value === true}
+          onChange={(e) => onChange({ target: { value: String(e.target.checked) } })}
+          className="rounded"
+        />
+        <span className="text-sm text-gray-700">{field.label}{field.required && <span className="text-red-500 ml-1">*</span>}</span>
+      </label>
+    );
+  }
+  return <Input {...common} type="text" />;
+}
+
 export default function IntakePage() {
   const navigate = useNavigate();
   const { orgSlug } = useParams();
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState(INITIAL);
+  const [form, setForm] = useState(FIXED_INITIAL);
+  const [customValues, setCustomValues] = useState({});
+  const [customFields, setCustomFields] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [orgName, setOrgName] = useState('');
 
   useEffect(() => {
     if (!orgSlug) return;
-    getOrgBySlug(orgSlug)
-      .then((org) => setOrgName(org.name))
+    Promise.all([getOrgBySlug(orgSlug), getOrgForm(orgSlug)])
+      .then(([org, fields]) => {
+        setOrgName(org.name);
+        setCustomFields(fields);
+        const initCustom = {};
+        fields.forEach(f => { initCustom[f.fieldKey] = f.fieldType === 'SELECT' && f.options?.length ? f.options[0] : ''; });
+        setCustomValues(initCustom);
+      })
       .catch(() => setError('This application link is not valid. Please check the URL and try again.'));
   }, [orgSlug]);
 
+  const STEPS = customFields.length > 0
+    ? ['Personal Info', 'Household & Employment', 'Hardship & Request', 'Additional Info', 'Review & Submit']
+    : ['Personal Info', 'Household & Employment', 'Hardship & Request', 'Review & Submit'];
+
+  const CUSTOM_STEP = customFields.length > 0 ? 3 : null;
+  const REVIEW_STEP = STEPS.length - 1;
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const setCustom = (key) => (e) => setCustomValues((v) => ({ ...v, [key]: e.target.value }));
 
   function validateStep(s) {
     if (s === 0) {
@@ -73,6 +113,17 @@ export default function IntakePage() {
       if (!form.hardshipDescription.trim()) return 'Please describe your hardship.';
       if (!form.requestedAmount || parseFloat(form.requestedAmount) < 1) return 'Requested amount must be at least $1.';
     }
+    if (s === CUSTOM_STEP) {
+      for (const field of customFields) {
+        if (!field.required) continue;
+        const val = customValues[field.fieldKey];
+        if (field.fieldType === 'CHECKBOX') {
+          if (val !== 'true') return `"${field.label}" is required.`;
+        } else if (!val || !String(val).trim()) {
+          return `"${field.label}" is required.`;
+        }
+      }
+    }
     return null;
   }
 
@@ -92,13 +143,13 @@ export default function IntakePage() {
         householdSize: parseInt(form.householdSize),
         monthlyIncome: parseFloat(form.monthlyIncome),
         requestedAmount: parseFloat(form.requestedAmount),
+        ...(customFields.length > 0 ? { customData: customValues } : {}),
       };
       const app = await createApplication(orgSlug, data);
       localStorage.setItem('ap_saved_app', JSON.stringify({ referenceNumber: app.referenceNumber, email: form.email, orgSlug }));
       navigate(`/apply/${orgSlug}/success`, { state: { referenceNumber: app.referenceNumber } });
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Submission failed. Please check your information.');
-      // Stay on the review step so the user can see their data and the error before going back
     } finally {
       setLoading(false);
     }
@@ -176,7 +227,21 @@ export default function IntakePage() {
             </div>
           )}
 
-          {step === 3 && (
+          {CUSTOM_STEP !== null && step === CUSTOM_STEP && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
+              {customFields.map((field) => (
+                <CustomField
+                  key={field.fieldKey}
+                  field={field}
+                  value={customValues[field.fieldKey]}
+                  onChange={setCustom(field.fieldKey)}
+                />
+              ))}
+            </div>
+          )}
+
+          {step === REVIEW_STEP && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Review Your Application</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -201,6 +266,20 @@ export default function IntakePage() {
                 <p className="text-xs text-gray-500 mb-1">Hardship Description</p>
                 <p className="text-gray-800">{form.hardshipDescription}</p>
               </div>
+              {customFields.length > 0 && (
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {customFields.map((field) => (
+                    <div key={field.fieldKey} className="bg-gray-50 rounded p-3">
+                      <p className="text-xs text-gray-500">{field.label}</p>
+                      <p className="font-medium text-gray-800">
+                        {field.fieldType === 'CHECKBOX'
+                          ? (customValues[field.fieldKey] === 'true' ? 'Yes' : 'No')
+                          : (customValues[field.fieldKey] || '—')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-gray-500 mt-4">
                 By submitting, you certify that all information provided is accurate and complete to the best of your knowledge.
               </p>
