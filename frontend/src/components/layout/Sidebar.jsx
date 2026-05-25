@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { key: 'reports', label: 'Reports', path: '/dashboard/reports', icon: '📈' },
   { key: 'users', label: 'User Management', path: '/dashboard/users', icon: '👥' },
   { key: 'form-builder', label: 'Intake Form', path: '/dashboard/form-builder', icon: '📝' },
+  { key: 'org-settings', label: 'Org Settings', path: '/dashboard/org-settings', icon: '⚙️' },
 ];
 
 export default function Sidebar({ onClose }) {

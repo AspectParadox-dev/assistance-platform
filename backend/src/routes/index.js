@@ -11,6 +11,7 @@ const usersRouter = require('./users.routes');
 const reportsRouter = require('./reports.routes');
 const publicRouter = require('./public.routes');
 const formFieldsRouter = require('./form-fields.routes');
+const organizationsRouter = require('./organizations.routes');
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/users', usersRouter);
 router.use('/reports', reportsRouter);
 router.use('/public', publicRouter);
 router.use('/form-fields', formFieldsRouter);
+router.use('/organizations', organizationsRouter);
 
 module.exports = router;

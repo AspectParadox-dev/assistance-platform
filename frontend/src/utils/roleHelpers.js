@@ -29,6 +29,7 @@ export function canAccessRoute(role, routeKey) {
     reports: ['PRESIDENT', 'TREASURER', 'ADMIN'],
     users: ['ADMIN'],
     'form-builder': ['ADMIN'],
+    'org-settings': ['ADMIN'],
   };
   return (access[routeKey] || []).includes(role);
 }

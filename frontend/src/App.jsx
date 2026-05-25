@@ -25,6 +25,7 @@ import ReconciliationPage from './pages/treasurer/ReconciliationPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import FormBuilderPage from './pages/admin/FormBuilderPage';
+import OrgSettingsPage from './pages/admin/OrgSettingsPage';
 import ReportsPage from './pages/shared/ReportsPage';
 
 const ALL_INTERNAL = ['CASE_MANAGER', 'COMPLIANCE_OFFICER', 'PRESIDENT', 'TREASURER', 'ADMIN'];
@@ -122,6 +123,12 @@ export default function App() {
             <ProtectedRoute allowedRoles={['ADMIN']} />
           }>
             <Route index element={<FormBuilderPage />} />
+          </Route>
+
+          <Route path="/dashboard/org-settings" element={
+            <ProtectedRoute allowedRoles={['ADMIN']} />
+          }>
+            <Route index element={<OrgSettingsPage />} />
           </Route>
 
           {/* Catch-all dashboard redirect */}
